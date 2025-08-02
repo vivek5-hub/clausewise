@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- [Previous head section remains exactly the same] -->
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- [Previous header and UI sections remain exactly the same until the script section] -->
+
+    <script>
+        // Initialize PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.worker.min.js';
+
+        // DOM Elements (same as before)
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const chooseFileBtn = document.getElementById('chooseFileBtn');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const resultsSection = document.getElementById('resultsSection');
+        // ... other DOM element references ...
+
+        // Backend API Configuration
+        const API_BASE_URL = 'http://localhost:5000'; // Update if your backend runs on different port
+        const ANALYZE_ENDPOINT = `${API_BASE_URL}/api/analyze`;
+
+        // Modified analyzeDocument() function to connect to backend
+        async function analyzeDocument() {
+            if (!selectedFile) {
+                showError('Please select a file first');
+                return;
+            }
+
+            // Reset UI
+            analysisStartTime = Date.now();
+            analyzeBtn.disabled = true;
+            loadingIndicator.classList.remove('hidden');
+            resultsSection.classList.add('hidden');
+            processingLogs.innerHTML = '';
+            
+            try {
+                updateProgress(10, 'Uploading document to server...');
+                addLog('Starting document analysis');
+
+                const formData = new FormData();
+                formData.append('document', selectedFile);
+                formData.append('analysisType', document.getElementById('analysisType').value);
+                formData.append('confidenceThreshold', document.getElementById('confidenceThreshold').value);
+
+                const response = await fetch(ANALYZE_ENDPOINT, {
+                    method: 'POST',
+                    body: formData
+                    // Note: Don't set Content-Type header for FormData - browser will set it automatically
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Analysis failed');
+                }
+
+                const { analysis } = await response.json();
+                
+                updateProgress(100, 'Analysis complete!');
+                addLog('Analysis completed successfully');
+                
+                // Process and display results from backend
+                displayResults(analysis);
+
+            } catch (error) {
+                console.error('Analysis error:', error);
+                addLog(`ERROR: ${error.message}`);
+                showError('Analysis failed: ' + error.message);
+            } finally {
+                analyzeBtn.disabled = false;
+                loadingIndicator.classList.add('hidden');
+            }
+        }
+
+        // Updated displayResults() to handle backend response format
+        function displayResults(analysis) {
+            // Document metadata
+            document.getElementById('docType').textContent = analysis.documentType || 'Unknown';
+            document.getElementById('confidence').textContent = analysis.confidenceScore ? 
+                `${Math.round(analysis.confidenceScore * 100)}%` : 'N/A';
+            document.getElementById('riskLevel').textContent = analysis.riskLevel || 'Medium';
+            document.getElementById('processingTime').textContent = analysis.processingTime ? 
+                `${analysis.processingTime.toFixed(1)}s` : 'N/A';
+
+            // Entities list
+            const entitiesList = document.getElementById('entitiesList');
+            entitiesList.innerHTML = '';
+            if (analysis.entities && analysis.entities.length) {
+                analysis.entities.forEach(entity => {
+                    const div = document.createElement('div');
+                    div.className = 'flex justify-between items-center';
+                    div.innerHTML = `
+                        <span class="entity-tag">${entity.name || 'Unknown'}</span>
+                        <span class="text-sm text-gray-500">
+                            ${entity.type || 'Unknown'} (${Math.round((entity.confidence || 0) * 100)}%)
+                        </span>
+                    `;
+                    entitiesList.appendChild(div);
+                });
+            }
+
+            // Risk assessment
+            const riskAssessment = document.getElementById('riskAssessment');
+            riskAssessment.innerHTML = '';
+            if (analysis.risks && analysis.risks.length) {
+                analysis.risks.forEach(risk => {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center justify-between p-4 bg-gray-50 rounded-lg';
+                    div.innerHTML = `
+                        <div class="flex items-center">
+                            <span class="risk-indicator risk-${risk.level?.toLowerCase() || 'medium'}"></span>
+                            <span class="font-medium">${risk.name || 'Unknown Risk'}</span>
+                        </div>
+                        <span class="text-sm text-gray-600">${risk.note || 'No details available'}</span>
+                    `;
+                    riskAssessment.appendChild(div);
+                });
+            }
+
+            // AI Insights
+            const aiInsights = document.getElementById('aiInsights');
+            aiInsights.innerHTML = '';
+            if (analysis.insights && analysis.insights.length) {
+                const colors = ['blue', 'green', 'yellow', 'purple'];
+                analysis.insights.forEach((insight, index) => {
+                    const div = document.createElement('div');
+                    div.className = `border-l-4 border-${colors[index % colors.length]}-500 pl-4`;
+                    div.innerHTML = `
+                        <p class="text-gray-800"><strong>${insight.title || 'Insight'}:</strong> ${insight.content || 'No content'}</p>
+                    `;
+                    aiInsights.appendChild(div);
+                });
+            }
+
+            // Initialize charts with backend data
+            if (analysis.sentiment) {
+                initializeSentimentChart(analysis.sentiment);
+            }
+            if (analysis.complianceScores) {
+                initializeComplianceChart(analysis.complianceScores);
+            }
+
+            // Show results section
+            resultsSection.classList.remove('hidden');
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Updated chart functions to use backend data
+        function initializeSentimentChart(sentimentData = { neutral: 70, positive: 20, negative: 10 }) {
+            const ctx = document.getElementById('sentimentChart')?.getContext('2d');
+            if (!ctx) return;
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Neutral', 'Positive', 'Negative'],
+                    datasets: [{
+                        data: [
+                            sentimentData.neutral || 0,
+                            sentimentData.positive || 0,
+                            sentimentData.negative || 0
+                        ],
+                        backgroundColor: ['#6b7280', '#10b981', '#ef4444'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function initializeComplianceChart(scores = [95, 88, 75, 92, 85]) {
+            const ctx = document.getElementById('complianceChart')?.getContext('2d');
+            if (!ctx) return;
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Confidentiality', 'Term Clarity', 'Remedies', 'Return Obligations', 'Definitions'],
+                    datasets: [{
+                        label: 'Compliance Score',
+                        data: scores,
+                        backgroundColor: '#4f46e5',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // [Rest of your existing helper functions remain the same]
+    </script>
+</body>
+</html>

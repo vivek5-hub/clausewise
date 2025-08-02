@@ -1,0 +1,7 @@
+legal/Lib/
+legal/Scripts/
+*.dll
+*.pyd
+*.pyc
+__pycache__/
+.env

@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal Document Analyzer - Hugging Face AI Integration</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        }
+        
+        .animate-pulse-custom {
+            animation: pulse-custom 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse-custom {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .code-block {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            color: #00ff00;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+        
+        .result-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .result-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .entity-tag {
+            display: inline-block;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin: 4px;
+            font-weight: 500;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .risk-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .risk-low { background-color: #10b981; }
+        .risk-medium { background-color: #f59e0b; }
+        .risk-high { background-color: #ef4444; }
+        
+        .chart-container {
+            height: 300px;
+            position: relative;
+        }
+        
+        .api-key-input {
+            letter-spacing: 1px;
+            font-family: monospace;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .progress-step {
+            transition: all 0.3s ease;
+        }
+
+        .progress-step.active {
+            color: #3b82f6;
+            transform: scale(1.1);
+            font-weight: 600;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-connected {
+            background-color: #10b981;
+            color: white;
+        }
+
+        .status-disconnected {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        .file-type-indicator {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 8px;
+        }
+
+        .file-type-pdf { background-color: #dc2626; color: white; }
+        .file-type-docx { background-color: #2563eb; color: white; }
+        .file-type-doc { background-color: #1d4ed8; color: white; }
+        .file-type-txt { background-color: #059669; color: white; }
+
+        .title-font {
+            font-family: 'Playfair Display', serif;
+            font-weight: 700;
+        }
+
+        .upload-area {
+            transition: all 0.3s ease;
+            background: rgba(249, 250, 251, 0.8);
+        }
+
+        .upload-area.active {
+            border-color: #3b82f6;
+            background: rgba(239, 246, 255, 0.8);
+        }
+
+        .document-preview {
+            max-height: 400px;
+            overflow-y: auto;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .document-preview::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .document-preview::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        .document-preview::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 20px;
+        }
+
+        .analysis-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+            transition: all 0.3s ease;
+        }
+
+        .analysis-section:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .section-header {
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            border-left: 4px solid #3b82f6;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #1e293b;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .slider-thumb::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Connection Status Indicator -->
+    <div id="connectionStatus" class="connection-status status-disconnected">
+        <i class="fas fa-circle mr-2"></i>
+        Connecting to backend...
+    </div>
+
+    <!-- Header Section -->
+    <div class="gradient-bg text-white py-12 relative overflow-hidden">
+        <div class="absolute inset-0 opacity-10" style="background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxkZWZzPjxwYXR0ZXJuIGlkPSJwYXR0ZXJuIiB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiIHBhdHRlcm5UcmFuc2Zvcm09InJvdGF0ZSg0NSkiPjxyZWN0IHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNwYXR0ZXJuKSIvPjwvc3ZnPg==');"></div>
+        <div class="max-w-7xl mx-auto px-4 relative">
+            <div class="text-center">
+                <h1 class="text-4xl md:text-5xl font-bold mb-4 title-font">
+                    <i class="fas fa-balance-scale mr-4"></i>
+                    Legal Document Analyzer
+                </h1>
+                <p class="text-xl md:text-2xl opacity-90 mb-6">
+                    AI-powered legal document analysis with Hugging Face Transformers
+                </p>
+                <div class="mt-6 flex justify-center space-x-4">
+                    <span class="glass-effect px-4 py-2 rounded-full text-sm">
+                        <i class="fas fa-brain mr-2"></i>Advanced NLP
+                    </span>
+                    <span class="glass-effect px-4 py-2 rounded-full text-sm">
+                        <i class="fas fa-shield-alt mr-2"></i>Secure Processing
+                    </span>
+                    <span class="glass-effect px-4 py-2 rounded-full text-sm">
+                        <i class="fas fa-bolt mr-2"></i>Rapid Analysis
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Document Upload Section -->
+        <div class="grid lg:grid-cols-3 gap-8 mb-8">
+            <div class="lg:col-span-2">
+                <div class="analysis-section p-6">
+                    <div class="section-header">
+                        <h2 class="text-2xl font-bold text-gray-800">
+                            <i class="fas fa-file-upload mr-2 text-blue-600"></i>
+                            Document Upload
+                        </h2>
+                        <p class="text-gray-600 text-sm mt-1">Upload your legal document for AI analysis</p>
+                    </div>
+                    
+                    <div id="uploadArea" class="upload-area border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer transition-colors">
+                        <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
+                        <p class="text-lg text-gray-600 font-medium">Drag and drop your legal document here</p>
+                        <p class="text-sm text-gray-500 mt-2">Supported formats: PDF, DOC, DOCX, TXT (Max 10MB)</p>
+                        <input type="file" id="fileInput" class="hidden" accept=".pdf,.doc,.docx,.txt">
+                        <button id="chooseFileBtn" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors shadow-md">
+                            <i class="fas fa-folder-open mr-2"></i>Browse Files
+                        </button>
+                    </div>
+                    
+                    <div id="fileInfo" class="hidden mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="font-medium" id="fileName"></p>
+                                <p class="text-sm text-gray-500" id="fileDetails"></p>
+                                <div id="extractionStatus" class="mt-2 text-sm"></div>
+                            </div>
+                            <i class="fas fa-check-circle text-green-500 text-xl"></i>
+                        </div>
+                    </div>
+                    
+                    <div id="documentPreview" class="hidden mt-4 document-preview">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-2">Document Preview:</h4>
+                        <div id="extractedText" class="text-sm text-gray-700 whitespace-pre-line"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <!-- Backend Configuration -->
+                <div class="analysis-section p-6">
+                    <div class="section-header">
+                        <h3 class="text-xl font-bold text-gray-800">
+                            <i class="fas fa-server mr-2 text-green-600"></i>
+                            Backend Configuration
+                        </h3>
+                        <p class="text-gray-600 text-sm mt-1">Connect to your analysis backend</p>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                                Backend URL
+                                <span class="tooltip ml-1">
+                                    <i class="fas fa-info-circle text-gray-400"></i>
+                                    <span class="tooltiptext">URL of your backend service (e.g., http://localhost:5000)</span>
+                                </span>
+                            </label>
+                            <input type="text" id="backendUrl" value="http://localhost:5000" 
+                                   class="w-full p-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <button id="testConnectionBtn" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg transition-colors shadow-md">
+                            <i class="fas fa-plug mr-2"></i>Test Connection
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Hugging Face Configuration -->
+                <div class="analysis-section p-6">
+                    <div class="section-header">
+                        <h3 class="text-xl font-bold text-gray-800">
+                            <i class="fas fa-cog mr-2 text-orange-600"></i>
+                            AI Model Configuration
+                        </h3>
+                        <p class="text-gray-600 text-sm mt-1">Select models and analysis parameters</p>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Model Selection</label>
+                            <select class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" id="hfModel">
+                                <option value="microsoft/DialoGPT-medium">DialoGPT Medium</option>
+                                <option value="facebook/bart-large-mnli">BART Large MNLI</option>
+                                <option value="distilbert-base-uncased-finetuned-sst-2-english">DistilBERT Sentiment</option>
+                                <option value="dbmdz/bert-large-cased-finetuned-conll03-english">BERT NER</option>
+                                <option value="microsoft/DialoGPT-large">DialoGPT Large</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Analysis Type</label>
+                            <select class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" id="analysisType">
+                                <option value="text-generation">Text Generation</option>
+                                <option value="text-classification">Text Classification</option>
+                                <option value="token-classification">Named Entity Recognition</option>
+                                <option value="question-answering">Question Answering</option>
+                                <option value="summarization">Text Summarization</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Parameters -->
+                <div class="analysis-section p-6">
+                    <div class="section-header">
+                        <h3 class="text-xl font-bold text-gray-800">
+                            <i class="fas fa-sliders-h mr-2 text-purple-600"></i>
+                            AI Parameters
+                        </h3>
+                        <p class="text-gray-600 text-sm mt-1">Fine-tune the analysis behavior</p>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1 flex justify-between">
+                                <span>Max Length <span class="text-gray-400">(200 tokens)</span></span>
+                                <span id="maxLengthValue" class="font-mono">200</span>
+                            </label>
+                            <input type="range" min="50" max="1000" step="50" value="200" class="w-full slider-thumb" id="maxLength">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1 flex justify-between">
+                                <span>Temperature <span class="text-gray-400">(0.7)</span></span>
+                                <span id="temperatureValue" class="font-mono">0.7</span>
+                            </label>
+                            <input type="range" min="0.1" max="1.0" step="0.1" value="0.7" class="w-full slider-thumb" id="temperature">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1 flex justify-between">
+                                <span>Confidence Threshold <span class="text-gray-400">(80%)</span></span>
+                                <span id="confidenceValue" class="font-mono">80%</span>
+                            </label>
+                            <input type="range" min="0.5" max="0.99" step="0.01" value="0.8" class="w-full slider-thumb" id="confidenceThreshold">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analysis Button -->
+        <div class="text-center mb-8">
+            <button id="analyzeBtn" class="relative bg-gradient-to-r from-blue-600 to-purple-600 text-white px-12 py-4 rounded-xl text-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl group">
+                <i class="fas fa-analytics mr-2"></i>
+                Analyze Document
+                <span class="absolute inset-x-0 bottom-0 h-1 bg-white opacity-20 scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></span>
+            </button>
+            <div id="loadingIndicator" class="hidden mt-4">
+                <div class="animate-pulse-custom text-blue-600">
+                    <i class="fas fa-spinner fa-spin mr-2"></i>
+                    <span id="loadingMessage">Processing with backend...</span>
+                </div>
+                <div class="w-64 bg-gray-200 rounded-full h-2 mx-auto mt-2">
+                    <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div class="mt-4 flex justify-center space-x-4 text-sm">
+                    <span class="progress-step" id="step1"><i class="fas fa-file-alt mr-1"></i>Reading Document</span>
+                    <span class="progress-step" id="step2"><i class="fas fa-brain mr-1"></i>AI Processing</span>
+                    <span class="progress-step" id="step3"><i class="fas fa-chart-bar mr-1"></i>Generating Results</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden space-y-8">
+            <!-- Overview Cards -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="result-card bg-white rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Document Type</p>
+                            <p class="text-2xl font-bold text-gray-900" id="docType">Contract</p>
+                        </div>
+                        <div class="bg-blue-100 rounded-full p-3">
+                            <i class="fas fa-file-contract text-blue-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="result-card bg-white rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Confidence Score</p>
+                            <p class="text-2xl font-bold text-gray-900" id="confidence">94.2%</p>
+                        </div>
+                        <div class="bg-green-100 rounded-full p-3">
+                            <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="result-card bg-white rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Model Used</p>
+                            <p class="text-lg font-bold text-gray-900" id="modelUsed">DialoGPT</p>
+                        </div>
+                        <div class="bg-orange-100 rounded-full p-3">
+                            <i class="fab fa-hugging-face text-orange-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="result-card bg-white rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Processing Time</p>
+                            <p class="text-2xl font-bold text-gray-900" id="processingTime">2.3s</p>
+                        </div>
+                        <div class="bg-purple-100 rounded-full p-3">
+                            <i class="fas fa-clock text-purple-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Analysis Results -->
+            <div class="grid lg:grid-cols-2 gap-8">
+                <!-- Generated Analysis -->
+                <div class="analysis-section p-6">
+                    <div class="section-header">
+                        <h3 class="text-xl font-bold text-gray-800">
+                            <i class="fas fa-robot mr-2 text-blue-600"></i>
+                            AI Generated Analysis
+                        </h3>
+                        <p class="text-gray-600 text-sm mt-1">Key insights from your document</p>
+                    </div>
+                    <div id="aiAnalysis" class="bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto">
+                        <p class="text-gray-600">Analysis results will appear here...</p>
+                    </div>
+                </div>
+
+                <!-- Classifications -->
+                <div class="analysis-section p-6">
+                    <div class="section-header">
+                        <h3 class="text-xl font-bold text-gray-800">
+                            <i class="fas fa-tags mr-2 text-green-600"></i>
+                            Document Classifications
+                        </h3>
+                        <p class="text-gray-600 text-sm mt-1">Categories and confidence scores</p>
+                    </div>
+                    <div id="classifications" class="space-y-3">
+                        <!-- Classifications will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Named Entities (if NER model is used) -->
+            <div class="analysis-section p-6 hidden" id="entitiesSection">
+                <div class="section-header">
+                    <h3 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-search mr-2 text-purple-600"></i>
+                        Named Entities
+                    </h3>
+                    <p class="text-gray-600 text-sm mt-1">Key entities identified in the document</p>
+                </div>
+                <div id="entitiesList" class="flex flex-wrap">
+                    <!-- Entities will be populated here -->
+                </div>
+            </div>
+
+            <!-- Summary (if summarization model is used) -->
+            <div class="analysis-section p-6 hidden" id="summarySection">
+                <div class="section-header">
+                    <h3 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-compress-alt mr-2 text-yellow-600"></i>
+                        Document Summary
+                    </h3>
+                    <p class="text-gray-600 text-sm mt-1">Concise overview of the document</p>
+                </div>
+                <div id="documentSummary" class="bg-gray-50 p-4 rounded-lg">
+                    <p class="text-gray-600">Summary will appear here...</p>
+                </div>
+            </div>
+
+            <!-- Processing Logs -->
+            <div class="analysis-section p-6">
+                <div class="section-header">
+                    <h3 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-terminal mr-2 text-gray-600"></i>
+                        Processing Logs
+                    </h3>
+                    <p class="text-gray-600 text-sm mt-1">Detailed analysis timeline</p>
+                </div>
+                <div id="processingLogs" class="bg-gray-900 rounded-lg p-4 text-green-400 font-mono text-sm max-h-64 overflow-y-auto">
+                    <!-- Logs will be populated here -->
+                </div>
+            </div>
+            
+            <!-- Extracted Text Preview -->
+            <div class="analysis-section p-6">
+                <div class="section-header">
+                    <h3 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-file-alt mr-2 text-blue-600"></i>
+                        Extracted Text Preview
+                    </h3>
+                    <p class="text-gray-600 text-sm mt-1">Raw text processed by the analyzer</p>
+                </div>
+                <div id="extractedTextFull" class="document-preview">
+                    <!-- Full extracted text will be shown here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-8 mt-16">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <p class="text-lg mb-2 title-font">Legal Document Analyzer</p>
+            <p class="text-gray-400">Powered by Hugging Face Transformers & State-of-the-Art NLP Models</p>
+            <div class="mt-4 flex justify-center space-x-6">
+                <a href="#" class="flex items-center text-sm hover:text-blue-300 transition-colors">
+                    <i class="fab fa-hugging-face mr-2"></i>
+                    Hugging Face API
+                </a>
+                <a href="#" class="flex items-center text-sm hover:text-blue-300 transition-colors">
+                    <i class="fas fa-brain mr-2"></i>
+                    Transformer Models
+                </a>
+                <a href="#" class="flex items-center text-sm hover:text-blue-300 transition-colors">
+                    <i class="fas fa-cloud mr-2"></i>
+                    Cloud Processing
+                </a>
+            </div>
+            <div class="mt-6 text-xs text-gray-500">
+                <p>© 2023 Legal Document Analyzer. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+    // Initialize PDF.js
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.worker.min.js';
+
+    // Backend Configuration
+    let BACKEND_URL = 'http://localhost:5000';
+    let isBackendConnected = false;
+
+    // DOM Elements
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const chooseFileBtn = document.getElementById('chooseFileBtn');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileDetails = document.getElementById('fileDetails');
+    const extractionStatus = document.getElementById('extractionStatus');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const loadingMessage = document.getElementById('loadingMessage');
+    const progressBar = document.getElementById('progressBar');
+    const resultsSection = document.getElementById('resultsSection');
+    const extractedText = document.getElementById('extractedText');
+    const extractedTextFull = document.getElementById('extractedTextFull');
+    const confidenceThreshold = document.getElementById('confidenceThreshold');
+    const confidenceValue = document.getElementById('confidenceValue');
+    const temperature = document.getElementById('temperature');
+    const temperatureValue = document.getElementById('temperatureValue');
+    const maxLength = document.getElementById('maxLength');
+    const maxLengthValue = document.getElementById('maxLengthValue');
+    const processingLogs = document.getElementById('processingLogs');
+    const hfModel = document.getElementById('hfModel');
+    const analysisType = document.getElementById('analysisType');
+    const backendUrl = document.getElementById('backendUrl');
+    const testConnectionBtn = document.getElementById('testConnectionBtn');
+    const connectionStatus = document.getElementById('connectionStatus');
+    const documentPreview = document.getElementById('documentPreview');
+
+    // State variables
+    let selectedFile = null;
+    let analysisStartTime = null;
+    let extractedContent = '';
+
+    // Event Listeners
+    document.addEventListener('DOMContentLoaded', initializeApp);
+    chooseFileBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', handleFileSelect);
+    uploadArea.addEventListener('dragover', handleDragOver);
+    uploadArea.addEventListener('dragleave', handleDragLeave);
+    uploadArea.addEventListener('drop', handleDrop);
+    analyzeBtn.addEventListener('click', analyzeDocument);
+    confidenceThreshold.addEventListener('input', updateConfidenceValue);
+    temperature.addEventListener('input', updateTemperatureValue);
+    maxLength.addEventListener('input', updateMaxLengthValue);
+    testConnectionBtn.addEventListener('click', testBackendConnection);
+    backendUrl.addEventListener('change', () => {
+        BACKEND_URL = backendUrl.value.trim();
+        testBackendConnection();
+    });
+
+    // Initialize the application
+    async function initializeApp() {
+        console.log('Legal Document Analyzer with Backend initialized');
+        updateConfidenceValue();
+        updateTemperatureValue();
+        updateMaxLengthValue();
+        addLog('Application initialized');
+        addLog('Supported formats: PDF, DOC, DOCX, TXT');
+        
+        // Test backend connection on startup
+        await testBackendConnection();
+    }
+
+    // Backend connection functions
+    async function testBackendConnection() {
+        try {
+            updateConnectionStatus('connecting');
+            addLog(`Testing connection to ${BACKEND_URL}`);
+            
+            const response = await fetch(`${BACKEND_URL}/health`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                isBackendConnected = true;
+                updateConnectionStatus('connected');
+                addLog(`Backend connected successfully: ${data.message || 'Health check passed'}`);
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+        } catch (error) {
+            isBackendConnected = false;
+            updateConnectionStatus('disconnected');
+            addLog(`Backend connection failed: ${error.message}`);
+            console.error('Backend connection error:', error);
+        }
+    }
+
+    function updateConnectionStatus(status) {
+        const statusElement = connectionStatus;
+        statusElement.className = 'connection-status';
+        
+        switch (status) {
+            case 'connected':
+                statusElement.classList.add('status-connected');
+                statusElement.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Backend Connected';
+                break;
+            case 'connecting':
+                statusElement.classList.add('status-disconnected');
+                statusElement.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Connecting...';
+                break;
+            case 'disconnected':
+            default:
+                statusElement.classList.add('status-disconnected');
+                statusElement.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>Backend Disconnected';
+                break;
+        }
+    }
+
+    // File handling functions
+    function handleDragOver(e) {
+        e.preventDefault();
+        uploadArea.classList.add('active');
+    }
+
+    function handleDragLeave() {
+        uploadArea.classList.remove('active');
+    }
+
+    function handleDrop(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('active');
+        if (e.dataTransfer.files.length > 0) {
+            handleFileSelect({ target: { files: e.dataTransfer.files } });
+        }
+    }
+
+    async function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        const validTypes = [
+            'application/pdf', 
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+            'application/msword', 
+            'text/plain'
+        ];
+        
+        if (!validTypes.includes(file.type)) {
+            showError('Please upload a valid PDF, DOC, DOCX, or TXT file');
+            return;
+        }
+
+        // Validate file size (10MB max)
+        if (file.size > 10 * 1024 * 1024) {
+            showError('File size exceeds 10MB limit');
+            return;
+        }
+
+        selectedFile = file;
+        
+        // Get file type for display
+        const fileTypeClass = getFileTypeClass(file.type);
+        const fileTypeName = getFileTypeName(file.type);
+        
+        fileName.innerHTML = `${file.name} <span class="file-type-indicator ${fileTypeClass}">${fileTypeName}</span>`;
+        fileDetails.textContent = `${formatFileSize(file.size)} • ${file.type}`;
+        fileInfo.classList.remove('hidden');
+        
+        // Update extraction status
+        extractionStatus.innerHTML = '<i class="fas fa-spinner fa-spin mr-2 text-blue-500"></i>Extracting text...';
+        
+        // Update upload area
+        uploadArea.classList.add('border-green-500', 'bg-green-50');
+        uploadArea.innerHTML = `
+            <i class="fas fa-check-circle text-4xl text-green-500 mb-4"></i>
+            <p class="text-lg text-green-600 font-medium">${file.name}</p>
+            <p class="text-sm text-gray-500 mt-2">Ready for analysis</p>
+        `;
+
+        // Extract text from file
+        try {
+            activateStep('step1');
+            addLog(`File selected: ${file.name} (${formatFileSize(file.size)}) - Type: ${fileTypeName}`);
+            extractedContent = await extractTextFromFile(file);
+            addLog(`Text extracted successfully: ${extractedContent.length} characters`);
+            
+            // Update extraction status
+            extractionStatus.innerHTML = `<i class="fas fa-check-circle mr-2 text-green-500"></i>Text extracted: ${extractedContent.length} characters`;
+            
+            // Show preview
+            const preview = extractedContent.length > 1000 
+                ? extractedContent.substring(0, 1000) + '...' 
+                : extractedContent;
+            extractedText.textContent = preview;
+            extractedTextFull.textContent = extractedContent;
+            documentPreview.classList.remove('hidden');
+        } catch (error) {
+            addLog(`Error extracting text: ${error.message}`);
+            extractionStatus.innerHTML = `<i class="fas fa-exclamation-triangle mr-2 text-red-500"></i>Error: ${error.message}`;
+            showError('Failed to extract text from file: ' + error.message);
+        }
+    }
+
+    // Enhanced text extraction function with proper DOCX support
+    async function extractTextFromFile(file) {
+        return new Promise((resolve, reject) => {
+            if (file.type === 'text/plain') {
+                // Handle TXT files
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = () => reject(new Error('Failed to read text file'));
+                reader.readAsText(file);
+                
+            } else if (file.type === 'application/pdf') {
+                // Handle PDF files
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const pdf = await pdfjsLib.getDocument(e.target.result).promise;
+                        let text = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const content = await page.getTextContent();
+                            text += content.items.map(item => item.str).join(' ') + '\n';
+                        }
+                        if (!text.trim()) {
+                            reject(new Error('No text found in PDF - document may be image-based'));
+                        } else {
+                            resolve(text);
+                        }
+                    } catch (error) {
+                        reject(new Error('Failed to extract text from PDF: ' + error.message));
+                    }
+                };
+                reader.onerror = () => reject(new Error('Failed to read PDF file'));
+                reader.readAsArrayBuffer(file);
+                
+            } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+                // Handle DOCX files using mammoth
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const result = await mammoth.extractRawText({arrayBuffer: e.target.result});
+                        if (!result.value.trim()) {
+                            reject(new Error('No text found in DOCX document'));
+                        } else {
+                            addLog(`DOCX processing: ${result.messages.length} messages/warnings`);
+                            if (result.messages.length > 0) {
+                                result.messages.forEach(msg => addLog(`DOCX: ${msg.message}`));
+                            }
+                            resolve(result.value);
+                        }
+                    } catch (error) {
+                        reject(new Error('Failed to extract text from DOCX: ' + error.message));
+                    }
+                };
+                reader.onerror = () => reject(new Error('Failed to read DOCX file'));
+                reader.readAsArrayBuffer(file);
+                
+            } else if (file.type === 'application/msword') {
+                // Handle older DOC files - note: limited support
+                // For full DOC support, you'd need a more specialized library
+                reject(new Error('Legacy DOC format has limited support. Please convert to DOCX or PDF for better results.'));
+                
+            } else {
+                reject(new Error('Unsupported file type: ' + file.type));
+            }
+        });
+    }
+
+    // Helper functions for file type display
+    function getFileTypeClass(mimeType) {
+        switch (mimeType) {
+            case 'application/pdf':
+                return 'file-type-pdf';
+            case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                return 'file-type-docx';
+            case 'application/msword':
+                return 'file-type-doc';
+            case 'text/plain':
+                return 'file-type-txt';
+            default:
+                return 'file-type-txt';
+        }
+    }
+
+    function getFileTypeName(mimeType) {
+        switch (mimeType) {
+            case 'application/pdf':
+                return 'PDF';
+            case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                return 'DOCX';
+            case 'application/msword':
+                return 'DOC';
+            case 'text/plain':
+                return 'TXT';
+            default:
+                return 'Unknown';
+        }
+    }
+
+    // Backend API integration
+    async function callBackendAPI(endpoint, data, method = 'POST') {
+        if (!isBackendConnected) {
+            throw new Error('Backend is not connected. Please check the connection.');
+        }
+
+        try {
+            const response = await fetch(`${BACKEND_URL}${endpoint}`, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: method === 'POST' ? JSON.stringify(data) : null
+            });
+
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(`Backend API error (${response.status}): ${errorData}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            addLog(`Backend API call failed: ${error.message}`);
+            throw error;
+        }
+    }
+
+    // Analysis functions
+    async function analyzeDocument() {
+        if (!selectedFile || !extractedContent) {
+            showError('Please select a file first');
+            return;
+        }
+
+        if (!extractedContent.trim()) {
+            showError('No text could be extracted from the document');
+            return;
+        }
+
+        if (!isBackendConnected) {
+            showError('Backend is not connected. Please check the connection.');
+            return;
+        }
+
+        // Reset UI
+        analysisStartTime = Date.now();
+        analyzeBtn.disabled = true;
+        loadingIndicator.classList.remove('hidden');
+        resultsSection.classList.add('hidden');
+        processingLogs.innerHTML = '';
+        
+        try {
+            activateStep('step2');
+            addLog('Starting document analysis with backend');
+            addLog(`Text length: ${extractedContent.length} characters`);
+            updateProgress(20);
+
+            const selectedModel = hfModel.value;
+            const selectedAnalysisType = analysisType.value;
+            
+            addLog(`Using model: ${selectedModel}`);
+            addLog(`Analysis type: ${selectedAnalysisType}`);
+
+            updateProgress(40);
+
+            // Prepare data for backend
+            const analysisData = {
+                text: extractedContent,
+                model: selectedModel,
+                analysis_type: selectedAnalysisType,
+                parameters: {
+                    max_length: parseInt(maxLength.value),
+                    temperature: parseFloat(temperature.value),
+                    confidence_threshold: parseFloat(confidenceThreshold.value)
+                },
+                document_info: {
+                    filename: selectedFile.name,
+                    file_type: getFileTypeName(selectedFile.type),
+                    file_size: selectedFile.size
+                }
+            };
+
+            // Call backend API
+            const results = await callBackendAPI('/analyze', analysisData);
+
+            updateProgress(80);
+            activateStep('step3');
+            
+            addLog('Analysis completed successfully');
+            showResults(results, selectedModel, selectedAnalysisType);
+            
+        } catch (error) {
+            console.error('Analysis error:', error);
+            addLog(`ERROR: ${error.message}`);
+            showError('Analysis failed: ' + error.message);
+        } finally {
+            analyzeBtn.disabled = false;
+            updateProgress(100);
+        }
+    }
+
+    // Results display functions
+    function showResults(results, model, analysisType) {
+        const processingTime = (Date.now() - analysisStartTime) / 1000;
+        document.getElementById('processingTime').textContent = processingTime.toFixed(1) + 's';
+        
+        // Update overview cards
+        document.getElementById('docType').textContent = results.document_type || detectDocumentType(extractedContent);
+        document.getElementById('confidence').textContent = (results.confidence || 0).toFixed(1) + '%';
+        document.getElementById('modelUsed').textContent = model.split('/').pop() || model;
+        
+        // Clear previous results
+        document.getElementById('aiAnalysis').innerHTML = '';
+        document.getElementById('classifications').innerHTML = '';
+        document.getElementById('entitiesList').innerHTML = '';
+        document.getElementById('documentSummary').innerHTML = '';
+        
+        // Display results based on analysis type and backend response
+        if (results.analysis_result) {
+            displayAnalysisResult(results.analysis_result, analysisType);
+        }
+        
+        if (results.classifications) {
+            displayClassifications(results.classifications);
+        }
+        
+        if (results.entities) {
+            displayEntities(results.entities);
+        }
+        
+        if (results.summary) {
+            displaySummary(results.summary);
+        }
+        
+        // Show/hide relevant sections
+        toggleSections(analysisType);
+        
+        // Show results section
+        resultsSection.classList.remove('hidden');
+        loadingIndicator.classList.add('hidden');
+        
+        // Scroll to results
+        resultsSection.scrollIntoView({ behavior: 'smooth' });
+        
+        addLog('Results displayed successfully');
+    }
+
+    function displayAnalysisResult(analysisResult, analysisType) {
+        const analysisDiv = document.getElementById('aiAnalysis');
+        
+        if (typeof analysisResult === 'string') {
+            analysisDiv.innerHTML = `
+                <div class="space-y-3">
+                    <div class="p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                        <h4 class="font-semibold text-blue-800 mb-2">AI Generated Analysis</h4>
+                        <p class="text-gray-700 whitespace-pre-wrap">${analysisResult}</p>
+                    </div>
+                </div>
+            `;
+        } else if (Array.isArray(analysisResult)) {
+            // Handle array results (like question-answering)
+            analysisDiv.innerHTML = '<div class="space-y-4"></div>';
+            const container = analysisDiv.querySelector('div');
+            
+            analysisResult.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'p-4 bg-gray-50 rounded-lg border-l-4 border-green-500';
+                
+                if (item.question && item.answer) {
+                    // Q&A format
+                    div.innerHTML = `
+                        <h4 class="font-semibold text-green-800 mb-2">${item.question}</h4>
+                        <p class="text-gray-700 mb-2">${item.answer}</p>
+                        ${item.confidence ? `<span class="text-xs text-gray-500">Confidence: ${(item.confidence * 100).toFixed(1)}%</span>` : ''}
+                    `;
+                } else if (item.generated_text) {
+                    // Generated text format
+                    div.innerHTML = `
+                        <h4 class="font-semibold text-blue-800 mb-2">Generated Text ${index + 1}</h4>
+                        <p class="text-gray-700">${item.generated_text}</p>
+                    `;
+                } else {
+                    // Generic format
+                    div.innerHTML = `
+                        <h4 class="font-semibold text-gray-800 mb-2">Result ${index + 1}</h4>
+                        <p class="text-gray-700">${JSON.stringify(item, null, 2)}</p>
+                    `;
+                }
+                
+                container.appendChild(div);
+            });
+        } else {
+            // Handle object results
+            analysisDiv.innerHTML = `
+                <div class="p-4 bg-gray-50 rounded-lg">
+                    <pre class="text-sm text-gray-700 whitespace-pre-wrap">${JSON.stringify(analysisResult, null, 2)}</pre>
+                </div>
+            `;
+        }
+    }
+
+    function displayClassifications(classifications) {
+        const classificationsDiv = document.getElementById('classifications');
+        classificationsDiv.innerHTML = '';
+        
+        if (Array.isArray(classifications)) {
+            classifications.forEach((classification) => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
+                div.innerHTML = `
+                    <span class="font-medium">${classification.label}</span>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-24 bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${(classification.score * 100)}%"></div>
+                        </div>
+                        <span class="text-sm text-gray-600">${(classification.score * 100).toFixed(1)}%</span>
+                    </div>
+                `;
+                classificationsDiv.appendChild(div);
+            });
+        }
+    }
+
+    function displayEntities(entities) {
+        const entitiesDiv = document.getElementById('entitiesList');
+        entitiesDiv.innerHTML = '';
+        
+        if (Array.isArray(entities)) {
+            // Group entities by type
+            const entityGroups = {};
+            entities.forEach(entity => {
+                const entityType = entity.entity_group || entity.entity || entity.label;
+                if (!entityGroups[entityType]) {
+                    entityGroups[entityType] = [];
+                }
+                entityGroups[entityType].push(entity);
+            });
+            
+            Object.keys(entityGroups).forEach(entityType => {
+                const entityList = entityGroups[entityType];
+                const uniqueWords = [...new Set(entityList.map(e => e.word || e.text || e.entity))];
+                
+                uniqueWords.forEach(word => {
+                    if (word) {
+                        const span = document.createElement('span');
+                        span.className = 'entity-tag';
+                        span.innerHTML = `${word} <small>(${entityType})</small>`;
+                        entitiesDiv.appendChild(span);
+                    }
+                });
+            });
+        }
+    }
+
+    function displaySummary(summary) {
+        const summaryDiv = document.getElementById('documentSummary');
+        let summaryText = '';
+        
+        if (typeof summary === 'string') {
+            summaryText = summary;
+        } else if (summary.summary_text) {
+            summaryText = summary.summary_text;
+        } else if (Array.isArray(summary) && summary.length > 0) {
+            summaryText = summary[0].summary_text || summary[0];
+        } else {
+            summaryText = JSON.stringify(summary);
+        }
+        
+        summaryDiv.innerHTML = `
+            <div class="p-4 bg-yellow-50 rounded-lg border-l-4 border-yellow-500">
+                <h4 class="font-semibold text-yellow-800 mb-2">Document Summary</h4>
+                <p class="text-gray-700">${summaryText}</p>
+            </div>
+        `;
+    }
+
+    function toggleSections(analysisType) {
+        const entitiesSection = document.getElementById('entitiesSection');
+        const summarySection = document.getElementById('summarySection');
+        
+        // Show/hide sections based on analysis type
+        if (analysisType === 'token-classification') {
+            entitiesSection.classList.remove('hidden');
+        } else {
+            entitiesSection.classList.add('hidden');
+        }
+        
+        if (analysisType === 'summarization') {
+            summarySection.classList.remove('hidden');
+        } else {
+            summarySection.classList.add('hidden');
+        }
+    }
+
+    function detectDocumentType(text) {
+        const lowerText = text.toLowerCase();
+        
+        if (lowerText.includes('contract') || lowerText.includes('agreement')) {
+            return 'Contract';
+        } else if (lowerText.includes('nda') || lowerText.includes('non-disclosure')) {
+            return 'NDA';
+        } else if (lowerText.includes('terms of service') || lowerText.includes('terms and conditions')) {
+            return 'Terms of Service';
+        } else if (lowerText.includes('privacy policy')) {
+            return 'Privacy Policy';
+        } else if (lowerText.includes('lease') || lowerText.includes('rental')) {
+            return 'Lease Agreement';
+        } else {
+            return 'Legal Document';
+        }
+    }
+
+    // UI Helper functions
+    function activateStep(stepId) {
+        // Remove active class from all steps
+        document.querySelectorAll('.progress-step').forEach(step => {
+            step.classList.remove('active');
+        });
+        
+        // Add active class to current step
+        document.getElementById(stepId)?.classList.add('active');
+    }
+
+    function updateProgress(percentage) {
+        progressBar.style.width = percentage + '%';
+    }
+
+    function addLog(message) {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = document.createElement('div');
+        logEntry.textContent = `[${timestamp}] ${message}`;
+        processingLogs.appendChild(logEntry);
+        processingLogs.scrollTop = processingLogs.scrollHeight;
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function updateConfidenceValue() {
+        if (confidenceThreshold && confidenceValue) {
+            confidenceValue.textContent = Math.round(confidenceThreshold.value * 100) + '%';
+        }
+    }
+
+    function updateTemperatureValue() {
+        if (temperature && temperatureValue) {
+            temperatureValue.textContent = temperature.value;
+        }
+    }
+
+    function updateMaxLengthValue() {
+        if (maxLength && maxLengthValue) {
+            maxLengthValue.textContent = maxLength.value;
+        }
+    }
+
+    function showError(message) {
+        uploadArea.classList.add('border-red-500', 'bg-red-50');
+        uploadArea.innerHTML = `
+            <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+            <p class="text-lg text-red-600 font-medium">Error</p>
+            <p class="text-sm text-gray-500 mt-2">${message}</p>
+            <button onclick="location.reload()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                <i class="fas fa-sync-alt mr-2"></i>Try Again
+            </button>
+        `;
+        
+        loadingIndicator.classList.add('hidden');
+        analyzeBtn.disabled = false;
+    }
+
+    // Model change handler
+    hfModel.addEventListener('change', function() {
+        const selectedModel = this.value;
+        addLog(`Model changed to: ${selectedModel}`);
+        
+        // Update analysis type based on model
+        if (selectedModel.includes('bart') && selectedModel.includes('mnli')) {
+            analysisType.value = 'text-classification';
+        } else if (selectedModel.includes('bert') && selectedModel.includes('ner')) {
+            analysisType.value = 'token-classification';
+        } else if (selectedModel.includes('dialogpt')) {
+            analysisType.value = 'text-generation';
+        }
+    });
+
+    // Analysis type change handler
+    analysisType.addEventListener('change', function() {
+        const selectedType = this.value;
+        addLog(`Analysis type changed to: ${selectedType}`);
+        
+        // Update model suggestions based on analysis type
+        const modelSelect = document.getElementById('hfModel');
+        const currentModel = modelSelect.value;
+        
+        // You could add logic here to suggest better models for specific tasks
+        if (selectedType === 'token-classification' && !currentModel.includes('bert')) {
+            addLog('Tip: BERT models work best for Named Entity Recognition');
+        } else if (selectedType === 'text-generation' && !currentModel.includes('gpt')) {
+            addLog('Tip: GPT models work best for text generation tasks');
+        }
+    });
+
+    </script>
+</body>
+</html>
